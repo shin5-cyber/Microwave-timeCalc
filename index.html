@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>おうちレンジ時間計算機 - チン！と鳴る楽しい時間計算アプリ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500;700&family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'M PLUS Rounded 1c', 'Kiwi Maru', sans-serif;
+            background-color: #fefaf0;
+        }
+
+        /* レンジのカタカタアニメーション */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(0px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(2px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(2px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shaking {
+            animation: shake 0.5s infinite;
+        }
+
+        /* ぼんやり光るアニメーション */
+        @keyframes pulse-glow {
+            0%, 100% { background-color: rgba(253, 224, 71, 0.2); box-shadow: inset 0 0 15px rgba(253, 224, 71, 0.4); }
+            50% { background-color: rgba(253, 224, 71, 0.6); box-shadow: inset 0 0 30px rgba(253, 224, 71, 0.8); }
+        }
+
+        .cooking-glow {
+            animation: pulse-glow 0.8s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12 text-gray-800">
+
+    <!-- ヘッダー -->
+    <header class="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-400 text-white shadow-md py-4 px-6 text-center relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        <h1 class="text-2xl md:text-3xl font-extrabold tracking-wider flex items-center justify-center gap-2 drop-shadow-sm">
+            <i data-lucide="microwave" class="w-8 h-8 md:w-10 md:h-10 animate-bounce"></i>
+            おうちレンジ時間計算機
+        </h1>
+        <p class="text-xs md:text-sm mt-1 font-medium opacity-90">ワット数や個数が違っても、ピッタリの加熱時間を割り出します！</p>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 mt-6">
+
+        <!-- 3カラム/2カラム構成 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- 左側：入力パネル (8カラム) -->
+            <div class="lg:col-span-8 flex flex-col gap-6">
+                
+                <!-- セクション1：食品パッケージの指定 (元データ) -->
+                <div class="bg-white rounded-3xl p-5 md:p-6 shadow-xl border-4 border-amber-200 transition-transform duration-200 hover:scale-[1.01]">
+                    <div class="flex items-center gap-2 mb-4 border-b-2 border-dashed border-amber-100 pb-2">
+                        <span class="bg-amber-400 text-white rounded-full p-1.5 flex items-center justify-center">
+                            <i data-lucide="package" class="w-5 h-5"></i>
+                        </span>
+                        <h2 class="text-lg font-bold text-amber-700">1. パッケージに書いてある設定</h2>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- パッケージワット数 -->
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+                                指定ワット数 <span class="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">必須</span>
+                            </label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button type="button" onclick="setPkgWatt(500)" id="btn-pkg-500" class="pkg-watt-btn py-2 text-sm font-bold rounded-xl border-2 border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors">500W</button>
+                                <button type="button" onclick="setPkgWatt(600)" id="btn-pkg-600" class="pkg-watt-btn py-2 text-sm font-bold rounded-xl border-2 border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors">600W</button>
+                                <button type="button" onclick="setPkgWatt('free')" id="btn-pkg-free" class="pkg-watt-btn py-2 text-sm font-bold rounded-xl border-2 border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors">自由入力</button>
+                            </div>
+                            <!-- 自由入力欄 (非表示から動的表示) -->
+                            <div id="pkg-watt-custom-container" class="mt-2 hidden">
+                                <div class="relative rounded-xl shadow-sm">
+                                    <input type="number" id="pkg-watt-custom" min="10" max="3000" step="10" placeholder="例: 700"
+                                        class="w-full pl-3 pr-10 py-2 bg-amber-50/50 border-2 border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 font-bold text-gray-700"
+                                        oninput="calculateRealtimeValidation()">
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 font-bold text-sm">W</span>
+                                    </div>
+                                </div>
+                                <span class="text-[10px] text-gray-400">10W〜3000Wの間で入力してください</span>
+                            </div>
+                        </div>
+
+                        <!-- パッケージ個数 -->
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1.5">
+                                指定の個数
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="changeValue('pkg-count', -1, 1)" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-all flex items-center justify-center font-bold text-lg text-gray-600">-</button>
+                                <input type="number" id="pkg-count" min="1" max="99" value="1" 
+                                    class="w-16 text-center py-2 bg-gray-50 border-2 border-gray-200 rounded-xl font-bold text-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                    onchange="validateMinMax('pkg-count', 1, 99)">
+                                <span class="font-bold text-gray-600">個</span>
+                                <button type="button" onclick="changeValue('pkg-count', 1, 1)" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-all flex items-center justify-center font-bold text-lg text-gray-600">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- パッケージ設定時間 -->
+                    <div class="mt-4">
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5 flex items-center justify-between">
+                            <span>指定の設定時間 <span class="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">必須</span></span>
+                            <span id="quick-time-total" class="text-xs text-gray-500 font-bold">合計: 0秒</span>
+                        </label>
+                        
+                        <div class="flex items-center gap-3">
+                            <!-- 分 -->
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <input type="number" id="pkg-min" min="0" max="59" value="1" 
+                                        class="w-full pl-3 pr-10 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-xl text-center font-bold text-xl text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                        onchange="validateMinMax('pkg-min', 0, 59)">
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 font-bold">分</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <span class="text-xl font-bold text-amber-300">:</span>
+
+                            <!-- 秒 -->
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <input type="number" id="pkg-sec" min="0" max="59" value="0" 
+                                        class="w-full pl-3 pr-10 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-xl text-center font-bold text-xl text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                        onchange="validateMinMax('pkg-sec', 0, 59)">
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 font-bold">秒</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- クイック時間入力ボタン -->
+                        <div class="flex flex-wrap gap-1.5 mt-3">
+                            <button type="button" onclick="addTime(1, 0)" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-orange-100 hover:bg-orange-200 text-orange-800 active:scale-95 transition-all">+1分</button>
+                            <button type="button" onclick="addTime(3, 0)" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-orange-100 hover:bg-orange-200 text-orange-800 active:scale-95 transition-all">+3分</button>
+                            <button type="button" onclick="addTime(0, 10)" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 active:scale-95 transition-all">+10秒</button>
+                            <button type="button" onclick="addTime(0, 30)" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 active:scale-95 transition-all">+30秒</button>
+                            <button type="button" onclick="clearTime()" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 active:scale-95 transition-all flex items-center gap-1"><i data-lucide="trash-2" class="w-3 h-3"></i>クリア</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- セクション2：おうちのレンジ設定 (宛先データ) -->
+                <div class="bg-white rounded-3xl p-5 md:p-6 shadow-xl border-4 border-orange-200 transition-transform duration-200 hover:scale-[1.01]">
+                    <div class="flex items-center justify-between mb-4 border-b-2 border-dashed border-orange-100 pb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-orange-500 text-white rounded-full p-1.5 flex items-center justify-center">
+                                <i data-lucide="home" class="w-5 h-5"></i>
+                            </span>
+                            <h2 class="text-lg font-bold text-orange-700">2. おうちのレンジ設定</h2>
+                        </div>
+                        <span class="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-bold">自動保存されます</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- 使用するワット数 -->
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+                                使用ワット数 <span class="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">必須</span>
+                            </label>
+                            <div class="grid grid-cols-4 gap-1.5">
+                                <button type="button" onclick="setMyWatt(500)" id="btn-my-500" class="my-watt-btn py-2 text-xs font-bold rounded-xl border-2 border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 transition-colors">500W</button>
+                                <button type="button" onclick="setMyWatt(600)" id="btn-my-600" class="my-watt-btn py-2 text-xs font-bold rounded-xl border-2 border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 transition-colors">600W</button>
+                                <button type="button" onclick="setMyWatt(800)" id="btn-my-800" class="my-watt-btn py-2 text-xs font-bold rounded-xl border-2 border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 transition-colors">800W</button>
+                                <button type="button" onclick="setMyWatt(1500)" id="btn-my-1500" class="my-watt-btn py-2 text-xs font-bold rounded-xl border-2 border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 transition-colors">1500W</button>
+                            </div>
+                            <!-- 自由入力に切り替えるボタン & 入力枠 -->
+                            <div class="mt-2">
+                                <button type="button" onclick="setMyWatt('free')" id="btn-my-free" class="my-watt-btn w-full py-1.5 text-xs font-bold rounded-xl border-2 border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 transition-colors">自由入力（その他のワット数）</button>
+                                
+                                <div id="my-watt-custom-container" class="mt-2 hidden">
+                                    <div class="relative rounded-xl shadow-sm">
+                                        <input type="number" id="my-watt-custom" min="10" max="3000" step="10" placeholder="例: 750"
+                                            class="w-full pl-3 pr-10 py-2 bg-orange-50/50 border-2 border-orange-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 font-bold text-gray-700"
+                                            oninput="calculateRealtimeValidation()">
+                                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                            <span class="text-gray-500 font-bold text-sm">W</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 温める個数 -->
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1.5">
+                                温める個数
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="changeValue('my-count', -1, 1)" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-all flex items-center justify-center font-bold text-lg text-gray-600">-</button>
+                                <input type="number" id="my-count" min="1" max="99" value="1" 
+                                    class="w-16 text-center py-2 bg-gray-50 border-2 border-gray-200 rounded-xl font-bold text-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                    onchange="validateMinMax('my-count', 1, 99)">
+                                <span class="font-bold text-gray-600">個</span>
+                                <button type="button" onclick="changeValue('my-count', 1, 1)" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-all flex items-center justify-center font-bold text-lg text-gray-600">+</button>
+                            </div>
+
+                            <!-- おまけ：レンジ個数補正トグル -->
+                            <div class="mt-3 bg-orange-50/70 p-2.5 rounded-xl border border-orange-100">
+                                <label class="flex items-center justify-between cursor-pointer">
+                                    <div class="flex flex-col">
+                                        <span class="text-xs font-bold text-orange-800">レンジ個数補正を行う</span>
+                                        <span class="text-[9px] text-orange-600">複数温める際の温めすぎを自動緩和します</span>
+                                    </div>
+                                    <div class="relative">
+                                        <input type="checkbox" id="count-correction" class="sr-only peer" checked>
+                                        <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 右側：電子レンジ・計算結果 (4カラム) -->
+            <div class="lg:col-span-4 flex flex-col gap-6">
+                
+                <!-- 電子レンジ型 計算開始コンポーネント -->
+                <div id="microwave-body" class="bg-slate-700 rounded-3xl p-4 shadow-xl border-4 border-slate-800 flex flex-col justify-between relative transition-transform duration-200">
+                    
+                    <!-- レンジの上部ロゴ＆排気口 -->
+                    <div class="flex justify-between items-center text-slate-500 mb-2 px-1 text-[10px] font-bold">
+                        <span>ECO-CHIN 3000</span>
+                        <div class="flex gap-0.5">
+                            <span class="w-3 h-1 bg-slate-600 rounded"></span>
+                            <span class="w-3 h-1 bg-slate-600 rounded"></span>
+                            <span class="w-3 h-1 bg-slate-600 rounded"></span>
+                        </div>
+                    </div>
+
+                    <!-- レンジ本体内部 -->
+                    <div class="grid grid-cols-12 gap-3 bg-slate-800 p-3 rounded-2xl border-2 border-slate-900">
+                        
+                        <!-- 窓（温め中に光る） -->
+                        <div id="microwave-window" class="col-span-8 bg-slate-950 aspect-[4/3] rounded-xl border-2 border-slate-900 overflow-hidden relative flex flex-col items-center justify-center transition-all duration-300">
+                            <!-- レンジのターンテーブルや、中身（おにぎり）のドット絵風表現 -->
+                            <div class="absolute bottom-2 left-0 right-0 h-1 bg-slate-700 mx-4 rounded"></div>
+                            
+                            <!-- 中身のオブジェクト (レンジの中に浮かぶお皿と食べ物) -->
+                            <div class="relative flex flex-col items-center mb-1">
+                                <div id="food-steam" class="hidden flex gap-1 mb-1 justify-center animate-bounce">
+                                    <span class="w-1 h-3 bg-amber-200 rounded-full opacity-60"></span>
+                                    <span class="w-1 h-3 bg-amber-200 rounded-full opacity-80"></span>
+                                    <span class="w-1 h-3 bg-amber-200 rounded-full opacity-60"></span>
+                                </div>
+                                <div id="food-emoji" class="text-3xl filter drop-shadow">🍙</div>
+                            </div>
+                            
+                            <!-- 加熱中の格子網のオーバーレイ -->
+                            <div class="absolute inset-0 bg-[linear-gradient(rgba(18,24,38,0.2)_1px,transparent_1px),linear-gradient(90deg,rgba(18,24,38,0.2)_1px,transparent_1px)] [background-size:3px_3px] pointer-events-none"></div>
+                        </div>
+
+                        <!-- 操作パネル -->
+                        <div class="col-span-4 flex flex-col justify-between py-1">
+                            <!-- 液晶部分 -->
+                            <div class="bg-emerald-950 rounded border border-emerald-800 py-1.5 px-1 text-center font-mono text-xs text-emerald-400 font-extrabold shadow-inner relative overflow-hidden min-h-[45px] flex flex-col justify-center">
+                                <div id="screen-status" class="text-[9px] uppercase tracking-tighter opacity-70">READY</div>
+                                <div id="screen-timer" class="text-base tracking-widest">00:00</div>
+                            </div>
+
+                            <!-- ダイヤル風グラフィック -->
+                            <div class="flex justify-center my-1.5">
+                                <div class="w-8 h-8 rounded-full border-2 border-slate-600 bg-slate-800 flex items-center justify-center relative cursor-pointer active:rotate-45 transition-transform">
+                                    <div class="absolute w-1 h-3 bg-slate-500 top-0 rounded"></div>
+                                </div>
+                            </div>
+
+                            <!-- レンジ開閉用プッシュバー（のようなデザイン装飾） -->
+                            <div class="h-3 bg-slate-900 rounded border border-slate-600"></div>
+                        </div>
+                    </div>
+
+                    <!-- 計算開始スタートボタン -->
+                    <button type="button" onclick="startMicrowaveCalculation()" id="btn-calc" 
+                        class="mt-4 w-full bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-white font-extrabold py-3.5 px-4 rounded-2xl shadow-lg border-b-4 border-amber-700 hover:border-b-2 active:border-b-0 hover:translate-y-[2px] active:translate-y-[4px] transition-all flex items-center justify-center gap-2 text-lg group">
+                        <i data-lucide="play" class="w-5 h-5 fill-current group-hover:scale-110 transition-transform"></i>
+                        計算開始！
+                    </button>
+                    
+                    <button type="button" onclick="playDing()" class="absolute -top-2 -right-2 bg-white hover:bg-amber-100 text-amber-600 border-2 border-amber-200 p-1.5 rounded-full shadow hover:scale-110 active:scale-95 transition-all" title="音量の確認テスト">
+                        <i data-lucide="volume-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- 計算結果表示エリア (初期は説明または結果を表示) -->
+                <div id="result-card" class="bg-amber-50 rounded-3xl p-5 border-4 border-dashed border-amber-300 shadow-inner min-h-[160px] flex flex-col items-center justify-center text-center">
+                    <div id="result-placeholder">
+                        <i data-lucide="calculator" class="w-10 h-10 text-amber-300 mx-auto mb-2 animate-pulse"></i>
+                        <h3 class="font-bold text-amber-800 text-sm">設定を入力してね</h3>
+                        <p class="text-xs text-amber-600/80 mt-1">「計算開始！」を押すと、最適な時間がここに表示されます。</p>
+                    </div>
+
+                    <div id="result-content" class="hidden w-full">
+                        <span class="bg-amber-400 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">計算結果</span>
+                        
+                        <div class="mt-3">
+                            <span id="result-time" class="text-4xl md:text-5xl font-black text-amber-600 block tracking-tight">--分 --秒</span>
+                            <span id="result-seconds" class="text-xs text-gray-500 font-bold block mt-1">(合計: --秒)</span>
+                        </div>
+
+                        <!-- 比較アドバイス -->
+                        <div class="mt-3 p-2 bg-white rounded-xl border border-amber-200 text-[11px] text-gray-600 text-left font-medium leading-relaxed">
+                            <i data-lucide="info" class="w-3.5 h-3.5 text-amber-500 inline mr-1 -mt-0.5"></i>
+                            <span id="result-advice"></span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- 3カラム/2カラム構成終了 -->
+
+        <!-- お気に入り ＆ 履歴セクション -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            
+            <!-- お気に入り登録 -->
+            <div class="bg-white rounded-3xl p-5 shadow-lg border-2 border-orange-100">
+                <div class="flex items-center justify-between mb-3 border-b border-orange-50 pb-2">
+                    <h3 class="font-bold text-orange-800 text-sm flex items-center gap-1.5">
+                        <i data-lucide="star" class="w-4 h-4 text-orange-400 fill-orange-400"></i>
+                        お気に入り登録
+                    </h3>
+                    <span class="text-[10px] text-gray-400">よく温めるものを登録！</span>
+                </div>
+
+                <!-- お気に入り簡単登録用入力フォーム -->
+                <div class="flex gap-2 mb-3">
+                    <input type="text" id="fav-name" placeholder="例: たこ焼き、お弁当" 
+                        class="flex-1 px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400 font-bold">
+                    <button type="button" onclick="saveFavorite()" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg active:scale-95 transition-all flex items-center gap-1">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>追加
+                    </button>
+                </div>
+
+                <!-- お気に入りリスト -->
+                <div id="favorite-list" class="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto">
+                    <!-- 動的生成 -->
+                </div>
+            </div>
+
+            <!-- 計算履歴 -->
+            <div class="bg-white rounded-3xl p-5 shadow-lg border-2 border-amber-100">
+                <div class="flex items-center justify-between mb-3 border-b border-amber-50 pb-2">
+                    <h3 class="font-bold text-amber-800 text-sm flex items-center gap-1.5">
+                        <i data-lucide="history" class="w-4 h-4 text-amber-500"></i>
+                        最近の計算履歴
+                    </h3>
+                    <button type="button" onclick="clearHistory()" class="text-[10px] text-red-500 hover:underline flex items-center gap-0.5">
+                        <i data-lucide="trash-2" class="w-3 h-3"></i>履歴をクリア
+                    </button>
+                </div>
+
+                <div id="history-list" class="flex flex-col gap-1.5 max-h-[180px] overflow-y-auto text-xs">
+                    <!-- 動的生成 -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 温めワンポイント解説 -->
+        <div class="mt-8 bg-amber-50/50 rounded-3xl p-5 border border-amber-200/50 text-xs text-gray-600">
+            <h4 class="font-bold text-amber-900 mb-2 flex items-center gap-1.5 text-sm">
+                <i data-lucide="lightbulb" class="w-4 h-4 text-amber-500"></i>
+                おうちレンジ時間計算機のべんりな豆知識
+            </h4>
+            <ul class="list-disc pl-4 space-y-1 font-medium">
+                <li><strong class="text-amber-800">高ワット数の注意：</strong> 1500Wや1000Wなど大きなワット数に変換した場合、計算時間は短くなりますが、外側だけが熱くなって中心が冷たいままになることがあります。途中で一度かき混ぜるか、少し低めのW数で時間をかけると均一に温まります。</li>
+                <li><strong class="text-amber-800">レンジ個数補正：</strong> 電子レンジは温めるものを増やすと負荷が分散するため、単純に2倍の個数だから2倍温めれば良いとは限りません。おうちレンジ時間計算機の「個数補正」をオンにしておくと、加熱しすぎを防ぐ自動調整が入ります。</li>
+            </ul>
+        </div>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="mt-12 text-center text-xs text-gray-400">
+        <p>© 2026 おうちレンジ時間計算機 - 毎日の自炊をちょっと楽しく。</p>
+    </footer>
+
+    <!-- JavaScript 制御 -->
+    <script>
+        // グローバルステート
+        let state = {
+            pkgWatt: 600,         // パッケージ指定ワット
+            pkgWattCustom: null, // パッケージ自由入力値
+            pkgCount: 1,         // パッケージ指定個数
+            pkgMin: 1,           // パッケージ分
+            pkgSec: 0,           // パッケージ秒
+            myWatt: 500,         // 自宅レンジワット
+            myWattCustom: null,  // 自宅自由入力値
+            myCount: 1,          // 温める個数
+            correction: true,    // 個数補正
+            favorites: [],       // お気に入り
+            history: []          // 計算履歴
+        };
+
+        // DOMロード時の初期化
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            loadStateFromLocalStorage();
+            updateUI();
+            calculateRealtimeValidation();
+        });
+
+        // LocalStorageから状態の復元
+        function loadStateFromLocalStorage() {
+            try {
+                const savedMyWatt = localStorage.getItem('my_watt');
+                if (savedMyWatt) {
+                    const parsed = JSON.parse(savedMyWatt);
+                    state.myWatt = parsed.myWatt;
+                    state.myWattCustom = parsed.myWattCustom;
+                }
+
+                const savedFavs = localStorage.getItem('favorites');
+                if (savedFavs) {
+                    state.favorites = JSON.parse(savedFavs);
+                } else {
+                    // デフォルトのお気に入り
+                    state.favorites = [
+                        { id: 'fav-1', name: '冷凍おにぎり 🍙', pkgWatt: 600, pkgMin: 1, pkgSec: 10, pkgCount: 1 },
+                        { id: 'fav-2', name: 'たこ焼き 🐙', pkgWatt: 500, pkgMin: 4, pkgSec: 0, pkgCount: 1 },
+                        { id: 'fav-3', name: '冷凍肉まん 🥟', pkgWatt: 600, pkgMin: 0, pkgSec: 40, pkgCount: 1 }
+                    ];
+                }
+
+                const savedHist = localStorage.getItem('history');
+                if (savedHist) {
+                    state.history = JSON.parse(savedHist);
+                }
+            } catch (e) {
+                console.error("LocalStorageの読み込みに失敗しました:", e);
+            }
+        }
+
+        // 状態をLocalStorageに保存
+        function saveStateToLocalStorage() {
+            try {
+                localStorage.setItem('my_watt', JSON.stringify({
+                    myWatt: state.myWatt,
+                    myWattCustom: state.myWattCustom
+                }));
+                localStorage.setItem('favorites', JSON.stringify(state.favorites));
+                localStorage.setItem('history', JSON.stringify(state.history));
+            } catch (e) {
+                console.error("LocalStorageの書き込みに失敗しました:", e);
+            }
+        }
+
+        // パッケージワット数の選択肢切り替え
+        function setPkgWatt(val) {
+            state.pkgWatt = val;
+            const customContainer = document.getElementById('pkg-watt-custom-container');
+            
+            if (val === 'free') {
+                customContainer.classList.remove('hidden');
+                document.getElementById('pkg-watt-custom').focus();
+            } else {
+                customContainer.classList.add('hidden');
+                state.pkgWattCustom = null;
+            }
+            updateWattBtnStyles('pkg', val);
+            calculateRealtimeValidation();
+        }
+
+        // 自宅レンジワット数の選択肢切り替え
+        function setMyWatt(val) {
+            state.myWatt = val;
+            const customContainer = document.getElementById('my-watt-custom-container');
+            
+            if (val === 'free') {
+                customContainer.classList.remove('hidden');
+                document.getElementById('my-watt-custom').focus();
+            } else {
+                customContainer.classList.add('hidden');
+                state.myWattCustom = null;
+            }
+            updateWattBtnStyles('my', val);
+            saveStateToLocalStorage();
+            calculateRealtimeValidation();
+        }
+
+        // ボタンのアクティブ状態のトグル
+        function updateWattBtnStyles(type, activeVal) {
+            const btns = document.querySelectorAll(`.${type}-watt-btn`);
+            btns.forEach(btn => {
+                if (btn.id === `btn-${type}-${activeVal}`) {
+                    // アクティブ
+                    btn.classList.add('bg-orange-500', 'text-white', 'border-orange-600', 'shadow-sm');
+                    btn.classList.remove('bg-orange-50', 'text-orange-800', 'border-orange-200', 'bg-amber-50', 'text-amber-800', 'border-amber-200');
+                    if (type === 'pkg') {
+                        btn.classList.add('bg-amber-500', 'border-amber-600');
+                        btn.classList.remove('bg-orange-500', 'border-orange-600');
+                    }
+                } else {
+                    // 非アクティブ
+                    btn.classList.remove('bg-orange-500', 'bg-amber-500', 'text-white', 'border-orange-600', 'border-amber-600', 'shadow-sm');
+                    if (type === 'pkg') {
+                        btn.classList.add('bg-amber-50', 'text-amber-800', 'border-amber-200');
+                    } else {
+                        btn.classList.add('bg-orange-50', 'text-orange-800', 'border-orange-200');
+                    }
+                }
+            });
+        }
+
+        // 個数チェンジャー
+        function changeValue(id, diff, min) {
+            const input = document.getElementById(id);
+            let current = parseInt(input.value) || 0;
+            current += diff;
+            if (current < min) current = min;
+            input.value = current;
+            
+            if (id === 'pkg-count') state.pkgCount = current;
+            if (id === 'my-count') {
+                state.myCount = current;
+                updateFoodEmoji();
+            }
+            calculateRealtimeValidation();
+        }
+
+        // 直接数値が手入力された際のバリデーション
+        function validateMinMax(id, min, max) {
+            const input = document.getElementById(id);
+            let val = parseInt(input.value);
+            if (isNaN(val) || val < min) val = min;
+            if (val > max) val = max;
+            input.value = val;
+
+            if (id === 'pkg-count') state.pkgCount = val;
+            if (id === 'pkg-min') state.pkgMin = val;
+            if (id === 'pkg-sec') state.pkgSec = val;
+            if (id === 'my-count') {
+                state.myCount = val;
+                updateFoodEmoji();
+            }
+            calculateRealtimeValidation();
+        }
+
+        // 個数によってお皿の上の食べ物絵文字を変更する楽しさ演出
+        function updateFoodEmoji() {
+            const count = state.myCount;
+            const emojiEl = document.getElementById('food-emoji');
+            
+            if (count === 1) {
+                emojiEl.innerText = "🍙";
+            } else if (count >= 2 && count <= 3) {
+                emojiEl.innerText = "🥟🥟";
+            } else if (count >= 4 && count <= 6) {
+                emojiEl.innerText = "🐙🍡🐙";
+            } else {
+                emojiEl.innerText = "🍿🔥🍿";
+            }
+        }
+
+        // クイック時間入力
+        function addTime(m, s) {
+            let currentMin = parseInt(document.getElementById('pkg-min').value) || 0;
+            let currentSec = parseInt(document.getElementById('pkg-sec').value) || 0;
+            
+            currentMin += m;
+            currentSec += s;
+
+            // 60秒繰り上げ
+            if (currentSec >= 60) {
+                currentMin += Math.floor(currentSec / 60);
+                currentSec = currentSec % 60;
+            }
+
+            if (currentMin > 59) currentMin = 59;
+            
+            document.getElementById('pkg-min').value = currentMin;
+            document.getElementById('pkg-sec').value = currentSec;
+            state.pkgMin = currentMin;
+            state.pkgSec = currentSec;
+            
+            calculateRealtimeValidation();
+        }
+
+        // 時間クリア
+        function clearTime() {
+            document.getElementById('pkg-min').value = 0;
+            document.getElementById('pkg-sec').value = 0;
+            state.pkgMin = 0;
+            state.pkgSec = 0;
+            calculateRealtimeValidation();
+        }
+
+        // 入力を随時検証して液晶に反映
+        function calculateRealtimeValidation() {
+            // 現在のワット数を取得
+            let pkgW = state.pkgWatt === 'free' ? parseInt(document.getElementById('pkg-watt-custom').value) : state.pkgWatt;
+            let myW = state.myWatt === 'free' ? parseInt(document.getElementById('my-watt-custom').value) : state.myWatt;
+            
+            let min = parseInt(document.getElementById('pkg-min').value) || 0;
+            let sec = parseInt(document.getElementById('pkg-sec').value) || 0;
+            let totalSec = min * 60 + sec;
+
+            // クイック合計表示
+            document.getElementById('quick-time-total').innerText = `合計: ${totalSec}秒`;
+
+            // レンジの液晶画面を更新
+            const dispMin = String(min).padStart(2, '0');
+            const dispSec = String(sec).padStart(2, '0');
+            document.getElementById('screen-timer').innerText = `${dispMin}:${dispSec}`;
+        }
+
+        // UIを最新のstateに基づいて更新
+        function updateUI() {
+            // パッケージワット
+            if (state.pkgWatt === 'free') {
+                document.getElementById('pkg-watt-custom-container').classList.remove('hidden');
+                if (state.pkgWattCustom) document.getElementById('pkg-watt-custom').value = state.pkgWattCustom;
+            } else {
+                document.getElementById('pkg-watt-custom-container').classList.add('hidden');
+            }
+            updateWattBtnStyles('pkg', state.pkgWatt);
+
+            // 自宅ワット
+            if (state.myWatt === 'free') {
+                document.getElementById('my-watt-custom-container').classList.remove('hidden');
+                if (state.myWattCustom) document.getElementById('my-watt-custom').value = state.myWattCustom;
+            } else {
+                document.getElementById('my-watt-custom-container').classList.add('hidden');
+            }
+            updateWattBtnStyles('my', state.myWatt);
+
+            // 個数と時間
+            document.getElementById('pkg-count').value = state.pkgCount;
+            document.getElementById('pkg-min').value = state.pkgMin;
+            document.getElementById('pkg-sec').value = state.pkgSec;
+            document.getElementById('my-count').value = state.myCount;
+
+            updateFoodEmoji();
+            renderFavorites();
+            renderHistory();
+        }
+
+        // Web Audio API による「チーン！」効果音の合成
+        function playDing() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                
+                const audioCtx = new AudioContext();
+                const now = audioCtx.currentTime;
+                
+                // 複数の周波数を重ねて「金属的な鈴の音」を作る
+                // 基本波 880Hz（A5音）とその倍音、非調和な成分
+                const frequencies = [880, 1320, 1760, 2200, 2640, 3500];
+                const gains = [0.3, 0.15, 0.1, 0.08, 0.05, 0.03]; // 高音になるほど小さく
+                
+                frequencies.forEach((freq, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now);
+                    
+                    // 指数的な音量減衰（チーーーーーーーン...）
+                    gainNode.gain.setValueAtTime(gains[i], now);
+                    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 1.8); // 1.8秒かけてほぼゼロにする
+                    
+                    osc.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    
+                    osc.start(now);
+                    osc.stop(now + 1.8);
+                });
+            } catch (e) {
+                console.warn("オーディオ再生がブロックされたか、未サポートの環境です:", e);
+            }
+        }
+
+        // 温め中の低周波ノイズ（ブーンという音）の合成
+        function playHumming(duration, callback) {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) {
+                    if (callback) callback();
+                    return;
+                }
+                
+                const audioCtx = new AudioContext();
+                const now = audioCtx.currentTime;
+                
+                // 120Hzの三角波（レンジのファンの音、電磁波の共鳴音のようなもの）
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(100, now);
+                
+                gainNode.gain.setValueAtTime(0.12, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + duration);
+                
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                osc.start(now);
+                osc.stop(now + duration);
+
+                setTimeout(() => {
+                    if (callback) callback();
+                }, duration * 1000);
+
+            } catch (e) {
+                if (callback) callback();
+            }
+        }
+
+        // レンジの計算・作動メインロジック
+        function startMicrowaveCalculation() {
+            // パラメータ取得
+            let pkgW = state.pkgWatt === 'free' ? parseInt(document.getElementById('pkg-watt-custom').value) : state.pkgWatt;
+            let myW = state.myWatt === 'free' ? parseInt(document.getElementById('my-watt-custom').value) : state.myWatt;
+            
+            let min = parseInt(document.getElementById('pkg-min').value) || 0;
+            let sec = parseInt(document.getElementById('pkg-sec').value) || 0;
+            let totalSec = min * 60 + sec;
+
+            let pkgCnt = parseInt(document.getElementById('pkg-count').value) || 1;
+            let myCnt = parseInt(document.getElementById('my-count').value) || 1;
+            
+            const isCorrection = document.getElementById('count-correction').checked;
+
+            // バリデーションチェック
+            if (!pkgW || pkgW <= 0) {
+                showSimpleError("パッケージのワット数を正しく入力してね！");
+                return;
+            }
+            if (!myW || myW <= 0) {
+                showSimpleError("おうちレンジのワット数を正しく入力してね！");
+                return;
+            }
+            if (totalSec <= 0) {
+                showSimpleError("温め時間を設定してね！");
+                return;
+            }
+
+            // 自由入力値をステートに保存
+            if (state.pkgWatt === 'free') state.pkgWattCustom = pkgW;
+            if (state.myWatt === 'free') state.myWattCustom = myW;
+            saveStateToLocalStorage();
+
+            // レンジが動いている演出（演出時間：0.8秒）
+            const rangeBody = document.getElementById('microwave-body');
+            const rangeWindow = document.getElementById('microwave-window');
+            const steam = document.getElementById('food-steam');
+            const scrStatus = document.getElementById('screen-status');
+            const scrTimer = document.getElementById('screen-timer');
+            const calcBtn = document.getElementById('btn-calc');
+
+            rangeBody.classList.add('shaking');
+            rangeWindow.classList.add('cooking-glow');
+            steam.classList.remove('hidden');
+            scrStatus.innerText = "HEATING";
+            calcBtn.disabled = true;
+
+            // 電子レンジ駆動音
+            playHumming(0.8, () => {
+                // アニメーションを終了して結果を出す
+                rangeBody.classList.remove('shaking');
+                rangeWindow.classList.remove('cooking-glow');
+                steam.classList.add('hidden');
+                scrStatus.innerText = "DONE!";
+                calcBtn.disabled = false;
+
+                // チン！と音を出す
+                playDing();
+
+                // 実際の計算処理
+                executeTimeCalculation(pkgW, myW, totalSec, pkgCnt, myCnt, isCorrection);
+            });
+        }
+
+        // 計算式の適用と結果出力
+        function executeTimeCalculation(pkgW, myW, totalSec, pkgCnt, myCnt, isCorrection) {
+            // 1. ワット数の比率計算
+            // W比 = パッケージW / おうちW
+            let wattRatio = pkgW / myW;
+
+            // 2. 個数の比率計算
+            // 単純比 = 温める個数 / 指定個数
+            let countRatio = myCnt / pkgCnt;
+
+            // レンジ個数補正（トグルがONの場合）
+            if (isCorrection && countRatio > 1) {
+                // 2個なら単純に2倍ではなく、1個追加ごとに約0.7倍づつ時間を延ばす (レンジの分散を考慮した一般的近似)
+                // 例: 2個 = 1.0 + (2-1)*0.7 = 1.7倍
+                countRatio = 1 + (countRatio - 1) * 0.7;
+            }
+
+            // 3. 総時間(秒)の計算
+            let finalSec = totalSec * wattRatio * countRatio;
+
+            // 4. 端数処理
+            // 四捨五入して秒単位にする
+            let calculatedSeconds = Math.round(finalSec);
+            if (calculatedSeconds < 1) calculatedSeconds = 1; // 最低1秒
+
+            const finalMin = Math.floor(calculatedSeconds / 60);
+            const finalRemainingSec = calculatedSeconds % 60;
+
+            // 表示更新
+            const displayTime = finalMin > 0 
+                ? `${finalMin}分 ${finalRemainingSec}秒` 
+                : `${finalRemainingSec}秒`;
+            
+            document.getElementById('screen-timer').innerText = `${String(finalMin).padStart(2, '0')}:${String(finalRemainingSec).padStart(2, '0')}`;
+
+            // 結果カードの表示切替
+            document.getElementById('result-placeholder').classList.add('hidden');
+            const resultContent = document.getElementById('result-content');
+            resultContent.classList.remove('hidden');
+
+            document.getElementById('result-time').innerText = displayTime;
+            document.getElementById('result-seconds').innerText = `合計: ${calculatedSeconds}秒`;
+
+            // アドバイス文の組み立て
+            let adviceStr = `${pkgW}Wで${Math.floor(totalSec/60)}分${totalSec%60}秒（計${totalSec}秒）の設定から変換しました。`;
+            if (pkgW > myW) {
+                adviceStr += ` パッケージ指定よりもワット数が低いため、少し長めの加熱になります。じっくり均等に温まります。`;
+            } else if (pkgW < myW) {
+                adviceStr += ` パッケージ指定よりも高ワット数のため、温めすぎによる焦げや乾燥にご注意ください。`;
+            } else {
+                adviceStr += ` ワット数は同じです。`;
+            }
+
+            if (myCnt > pkgCnt) {
+                adviceStr += ` ${myCnt}個まとめて温めるため、吹きこぼれや温まりムラがないか様子を見ながら加熱してください。`;
+            }
+
+            document.getElementById('result-advice').innerText = adviceStr;
+
+            // 履歴に登録
+            addHistoryRecord(pkgW, myW, totalSec, calculatedSeconds, pkgCnt, myCnt);
+        }
+
+        // 簡易トースト調エラー表示（alert不使用の制約遵守）
+        function showSimpleError(msg) {
+            // 既存のエラーがあれば消す
+            const oldToast = document.getElementById('error-toast');
+            if (oldToast) oldToast.remove();
+
+            const toast = document.createElement('div');
+            toast.id = 'error-toast';
+            toast.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white font-bold text-sm py-3 px-6 rounded-2xl shadow-2xl border-2 border-red-400 z-50 flex items-center gap-2 animate-bounce';
+            toast.innerHTML = `<i data-lucide="alert-triangle" class="w-5 h-5"></i><span>${msg}</span>`;
+            document.body.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.classList.remove('animate-bounce');
+                toast.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
+        }
+
+        // お気に入りリストの表示
+        function renderFavorites() {
+            const listEl = document.getElementById('favorite-list');
+            listEl.innerHTML = '';
+
+            if (state.favorites.length === 0) {
+                listEl.innerHTML = `<span class="text-xs text-gray-400 font-bold p-2">登録がありません</span>`;
+                return;
+            }
+
+            state.favorites.forEach(fav => {
+                const btn = document.createElement('div');
+                btn.className = 'group flex items-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 py-1.5 px-3 rounded-full text-xs font-bold transition-all';
+                
+                // タップした時の読込エリア
+                const clickArea = document.createElement('button');
+                clickArea.type = 'button';
+                clickArea.className = 'text-amber-800 text-left';
+                clickArea.innerText = `${fav.name} (${fav.pkgWatt}W:${fav.pkgMin}分${fav.pkgSec}秒)`;
+                clickArea.onclick = () => loadFavorite(fav);
+
+                // 削除用ボタン
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'text-red-400 hover:text-red-600 transition-colors opacity-60 group-hover:opacity-100 ml-1.5';
+                delBtn.innerHTML = '<i data-lucide="x" class="w-3.5 h-3.5"></i>';
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteFavorite(fav.id);
+                };
+
+                btn.appendChild(clickArea);
+                btn.appendChild(delBtn);
+                listEl.appendChild(btn);
+            });
+            lucide.createIcons();
+        }
+
+        // お気に入りの登録実行
+        function saveFavorite() {
+            const nameEl = document.getElementById('fav-name');
+            const name = nameEl.value.trim();
+
+            if (!name) {
+                showSimpleError("お気に入りの名前を入力してね！（例: 冷凍からあげ）");
+                return;
+            }
+
+            let pkgW = state.pkgWatt === 'free' ? parseInt(document.getElementById('pkg-watt-custom').value) : state.pkgWatt;
+            let min = parseInt(document.getElementById('pkg-min').value) || 0;
+            let sec = parseInt(document.getElementById('pkg-sec').value) || 0;
+
+            if (!pkgW) {
+                showSimpleError("ワット数が正しく設定されていません。");
+                return;
+            }
+            if (min * 60 + sec <= 0) {
+                showSimpleError("設定時間が設定されていません。");
+                return;
+            }
+
+            const newFav = {
+                id: 'fav-' + Date.now(),
+                name: name,
+                pkgWatt: pkgW,
+                pkgMin: min,
+                pkgSec: sec,
+                pkgCount: state.pkgCount
+            };
+
+            state.favorites.push(newFav);
+            nameEl.value = ''; // クリア
+            saveStateToLocalStorage();
+            renderFavorites();
+        }
+
+        // お気に入りを読み込む
+        function loadFavorite(fav) {
+            // ワット数の読み込み
+            if ([500, 600].includes(fav.pkgWatt)) {
+                setPkgWatt(fav.pkgWatt);
+            } else {
+                setPkgWatt('free');
+                setTimeout(() => {
+                    document.getElementById('pkg-watt-custom').value = fav.pkgWatt;
+                    calculateRealtimeValidation();
+                }, 50);
+            }
+
+            // 個数と時間の読み込み
+            state.pkgCount = fav.pkgCount || 1;
+            state.pkgMin = fav.pkgMin;
+            state.pkgSec = fav.pkgSec;
+
+            updateUI();
+            calculateRealtimeValidation();
+
+            // レンジ液晶のブリンク演出でお知らせ
+            const timerEl = document.getElementById('screen-timer');
+            timerEl.classList.add('opacity-30');
+            setTimeout(() => timerEl.classList.remove('opacity-30'), 150);
+        }
+
+        // お気に入りの削除
+        function deleteFavorite(id) {
+            state.favorites = state.favorites.filter(fav => fav.id !== id);
+            saveStateToLocalStorage();
+            renderFavorites();
+        }
+
+        // 計算履歴の作成・保存
+        function addHistoryRecord(pkgW, myW, totalSec, calculatedSec, pkgCnt, myCnt) {
+            const record = {
+                id: 'hist-' + Date.now(),
+                timeStr: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+                pkgW,
+                myW,
+                pkgMin: Math.floor(totalSec / 60),
+                pkgSec: totalSec % 60,
+                pkgCnt,
+                myCnt,
+                calcMin: Math.floor(calculatedSec / 60),
+                calcSec: calculatedSec % 60
+            };
+
+            state.history.unshift(record); // 最新を先頭に
+            if (state.history.length > 10) {
+                state.history.pop(); // 最大10件
+            }
+
+            saveStateToLocalStorage();
+            renderHistory();
+        }
+
+        // 履歴の描画
+        function renderHistory() {
+            const listEl = document.getElementById('history-list');
+            listEl.innerHTML = '';
+
+            if (state.history.length === 0) {
+                listEl.innerHTML = `<span class="text-xs text-gray-400 font-bold p-2">まだ計算履歴がありません</span>`;
+                return;
+            }
+
+            state.history.forEach(hist => {
+                const item = document.createElement('div');
+                item.className = 'bg-gray-50 border border-gray-100 rounded-xl p-2.5 flex justify-between items-center hover:bg-amber-50/40 cursor-pointer transition-colors';
+                item.onclick = () => applyHistory(hist);
+
+                const left = document.createElement('div');
+                left.className = 'font-bold text-gray-700 flex flex-col gap-0.5';
+                
+                // 元の設定
+                const origin = document.createElement('span');
+                origin.className = 'text-[10px] text-gray-400';
+                origin.innerText = `元: ${hist.pkgW}W・${hist.pkgMin}分${hist.pkgSec}秒 (x${hist.pkgCnt}個)`;
+
+                // 変換後の時間
+                const dest = document.createElement('span');
+                dest.className = 'text-amber-700';
+                dest.innerText = `おうちレンジ (${hist.myW}W x${hist.myCnt}個) ➔ `;
+
+                const boldTime = document.createElement('strong');
+                boldTime.className = 'text-orange-600 ml-1 text-sm';
+                boldTime.innerText = `${hist.calcMin}分 ${hist.calcSec}秒`;
+                dest.appendChild(boldTime);
+
+                left.appendChild(origin);
+                left.appendChild(dest);
+
+                const right = document.createElement('div');
+                right.className = 'text-[10px] text-gray-400 text-right font-medium';
+                right.innerHTML = `<span>${hist.timeStr}</span><span class="block text-[8px] text-amber-500 font-extrabold mt-0.5">再セット</span>`;
+
+                item.appendChild(left);
+                item.appendChild(right);
+                listEl.appendChild(item);
+            });
+        }
+
+        // 履歴レコードをクリックした時に再適用する
+        function applyHistory(hist) {
+            // パッケージ側適用
+            if ([500, 600].includes(hist.pkgW)) {
+                setPkgWatt(hist.pkgW);
+            } else {
+                setPkgWatt('free');
+                setTimeout(() => {
+                    document.getElementById('pkg-watt-custom').value = hist.pkgW;
+                    calculateRealtimeValidation();
+                }, 50);
+            }
+            state.pkgMin = hist.pkgMin;
+            state.pkgSec = hist.pkgSec;
+            state.pkgCount = hist.pkgCnt || 1;
+
+            // レンジ側適用
+            if ([500, 600, 800, 1500].includes(hist.myW)) {
+                setMyWatt(hist.myW);
+            } else {
+                setMyWatt('free');
+                setTimeout(() => {
+                    document.getElementById('my-watt-custom').value = hist.myW;
+                    calculateRealtimeValidation();
+                }, 50);
+            }
+            state.myCount = hist.myCnt || 1;
+
+            updateUI();
+            calculateRealtimeValidation();
+        }
+
+        // 履歴をクリア
+        function clearHistory() {
+            state.history = [];
+            saveStateToLocalStorage();
+            renderHistory();
+        }
+    </script>
+</body>
+</html>
